@@ -1,0 +1,31 @@
+from src.settings import settings
+from init import routes, app, log
+from aiohttp import web
+from asyncio import new_event_loop, set_event_loop, Future
+
+
+async def main():
+    log.info("Démarrage du serveur...")
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(runner, "0.0.0.0", settings.server_port)
+    await site.start()
+    log.info(f"Serveur interne en ligne sur localhost:{settings.server_port}")
+
+    await Future()
+
+
+if __name__ == "__main__":
+    from src import v1, health
+
+    app.add_routes(routes)
+    loop = new_event_loop()
+    set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+
+    except KeyboardInterrupt:
+        log.info("Bye")
+        exit(0)
