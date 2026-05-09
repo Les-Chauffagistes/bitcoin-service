@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "${SERVER_PORT:-8086}:${SERVER_PORT:-8086}"
+    restart: unless-stopped
