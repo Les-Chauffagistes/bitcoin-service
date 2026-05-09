@@ -1,5 +1,5 @@
-from init import routes, app, log
 from src.settings import settings
+from init import routes, app, log
 from aiohttp import web
 from asyncio import new_event_loop, set_event_loop, Future
 
@@ -20,10 +20,7 @@ async def main():
 if __name__ == "__main__":
     from src import v1, health
 
-    from src.v1.app import routes as v1_routes
     app.add_routes(routes)
-    app.add_routes(v1_routes)
-
     loop = new_event_loop()
     set_event_loop(loop)
     try:

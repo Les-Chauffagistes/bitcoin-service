@@ -1,13 +1,16 @@
-def get_block_reward():
-    # TODO: bitcoin-cli getmininginfo
-    # HEIGHT=output["blocks"]
-    # ERA=HEIGHT / 210000
-    # reward = 50 / (2 ** ERA)
+from src.settings import settings
+from src.modules.bitcoin_cli.client import Client
 
-    pass
+client = Client(settings.blockchain_dir)
+
+
+def get_block_reward():
+    info = client.get_mining_info()
+    height = info.blocks
+    ERA = height // 210000
+    return 50 / (2**ERA)
+
 
 def get_difficulty():
-    # TODO: bitcoin-cli getmininginfo
-    # d=output["difficulty"]
-    
-    pass
+    info = client.get_mining_info()
+    return info.difficulty
