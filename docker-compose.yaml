@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      BLOCKCHAIN_DIR: /blockchain-data
+    ports:
+      - "${SERVER_PORT:-8086}:${SERVER_PORT:-8086}"
+    volumes:
+      - ${BLOCKCHAIN_DIR:-/root/.bitcoin}:/blockchain-data:ro
+    restart: unless-stopped
