@@ -3,7 +3,10 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     server_port: int
-    blockchain_dir: str
+    bitcoin_rpc_host: str
+    bitcoin_rpc_port: int = 8332
+    bitcoin_rpc_user: str
+    bitcoin_rpc_password: str
 
     model_config = {"env_file": ".env"}
 
