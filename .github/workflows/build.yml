@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*.*.*"]
+  pull_request:
+
+
+jobs:
+  build-push:
+    uses: les-chauffagistes/deploy/.github/workflows/build.yml@develop
+    with:
+      service-name: bitcoin-service
+    secrets:
+      REGISTRY_USER:     ${{ secrets.REGISTRY_USER }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}

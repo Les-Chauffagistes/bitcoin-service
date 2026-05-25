@@ -7,6 +7,7 @@ from typing import Awaitable, Callable
 async def cors_middleware(request: Request, handler: Callable[[Request], Awaitable[StreamResponse]]) -> StreamResponse:
     allowed_origins = {
         "https://heatboard.chauffagistes-btc.fr",
+        "https://heatboard.staging.chauffagistes-btc.fr",
     }
 
     if request.method == "OPTIONS":
