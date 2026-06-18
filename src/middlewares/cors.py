@@ -8,6 +8,8 @@ async def cors_middleware(request: Request, handler: Callable[[Request], Awaitab
     allowed_origins = {
         "https://heatboard.chauffagistes-btc.fr",
         "https://heatboard.staging.chauffagistes-btc.fr",
+        "https://contenders.chauffagistes-btc.fr",
+        "https://contenders.staging.chauffagistes-btc.fr",
     }
 
     if request.method == "OPTIONS":
