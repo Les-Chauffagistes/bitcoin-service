@@ -12,3 +12,7 @@ async def get_difficulty(_: Request):
 @routes.get("/bitcoin-block-reward")
 async def get_block_reward(_: Request):
     return json_response(await onchain.get_block_reward())
+
+@routes.get("/bitcoin-block-height")
+async def get_block_height(_: Request):
+    return json_response(await onchain.get_block_height())

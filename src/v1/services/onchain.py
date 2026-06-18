@@ -35,3 +35,7 @@ async def get_difficulty() -> float:
             async with session.get(_DIFFICULTY_FALLBACK) as resp:
                 resp.raise_for_status()
                 return float(await resp.text())
+
+async def get_block_height() -> int:
+    info = await client.get_mining_info()
+    return info.blocks
