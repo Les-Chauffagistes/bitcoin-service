@@ -5,20 +5,25 @@ from typing import Awaitable, Callable
 
 @middleware
 async def cors_middleware(request: Request, handler: Callable[[Request], Awaitable[StreamResponse]]) -> StreamResponse:
+    allowed_origins = {
+        "https://heatboard.chauffagistes-btc.fr",
+        "https://heatboard.staging.chauffagistes-btc.fr",
+        "https://contenders.chauffagistes-btc.fr",
+        "https://contenders.staging.chauffagistes-btc.fr",
+    }
+
     if request.method == "OPTIONS":
-        response = Response()
+        response = Response(status=204)
     else:
         response = await handler(request)
 
     origin = request.headers.get("Origin")
 
-    if origin in [
-        "https://app.swakraft.fr",
-        "https://auth.swakraft.fr"
-    ]:
+    if origin in allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 
     return response

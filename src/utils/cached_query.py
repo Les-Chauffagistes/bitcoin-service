@@ -14,17 +14,28 @@ def _get_session() -> ClientSession:
     return _session
 
 
-async def cached_get(url: str, ttl: int = 30) -> Any:
+async def cached_get(urls: str | list[str], ttl: int = 30) -> Any:
+    if isinstance(urls, str):
+        urls = [urls]
+
     now = datetime.now()
-    entry = _cache.get(url)
-    if entry is not None:
-        cached_at, body = entry
-        if now - cached_at < timedelta(seconds=ttl):
+    last_error: Exception | None = None
+
+    for url in urls:
+        entry = _cache.get(url)
+        if entry is not None:
+            cached_at, body = entry
+            if now - cached_at < timedelta(seconds=ttl):
+                return body
+
+        try:
+            session = _get_session()
+            async with session.get(url) as response:
+                response.raise_for_status()
+                body = await response.json()
+            _cache[url] = (now, body)
             return body
+        except Exception as e:
+            last_error = e
 
-    session = _get_session()
-    async with session.get(url) as response:
-        body = await response.json()
-
-    _cache[url] = (now, body)
-    return body
+    raise last_error  # type: ignore[misc]

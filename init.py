@@ -6,7 +6,7 @@ from aiohttp.web import Application, RouteTableDef
 log = logger.Logger("output.log")
 
 app = Application(
-    middlewares=(error_handler,cors_middleware)
+    middlewares=(cors_middleware, error_handler)
 )
 
 routes = RouteTableDef()
