@@ -9,6 +9,7 @@ on:
 
 jobs:
   build-push:
+    if: github.event_name == 'push'
     uses: les-chauffagistes/deploy/.github/workflows/build.yml@develop
     with:
       service-name: bitcoin-service
