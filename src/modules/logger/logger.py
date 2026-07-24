@@ -15,10 +15,7 @@ class Logger(AbstractLogger):
         return self.consoleHandler.info(*content)
     
     def log(self, *content: Any):
-        if self.fileHandler:
-            self.fileHandler.log(*content)
-
-        return self.consoleHandler.log(*content)
+        return self.info(*content)
 
     def warn(self, *content: Any):
         if self.fileHandler:
