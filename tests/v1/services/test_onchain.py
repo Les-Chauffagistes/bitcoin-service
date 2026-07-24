@@ -6,8 +6,12 @@ from src.v1.services import onchain
 
 
 @pytest.mark.asyncio
-async def test_get_block_height_uses_rpc_result():
-    onchain.client.get_mining_info = AsyncMock(return_value=MagicMock(blocks=910000, difficulty=1.0))
+async def test_get_block_height_uses_rpc_result(monkeypatch):
+    monkeypatch.setattr(
+        onchain.client,
+        "get_mining_info",
+        AsyncMock(return_value=MagicMock(blocks=910000, difficulty=1.0)),
+    )
 
     result = await onchain.get_block_height()
 
@@ -15,8 +19,12 @@ async def test_get_block_height_uses_rpc_result():
 
 
 @pytest.mark.asyncio
-async def test_get_difficulty_uses_rpc_result():
-    onchain.client.get_mining_info = AsyncMock(return_value=MagicMock(blocks=910000, difficulty=456.7))
+async def test_get_difficulty_uses_rpc_result(monkeypatch):
+    monkeypatch.setattr(
+        onchain.client,
+        "get_mining_info",
+        AsyncMock(return_value=MagicMock(blocks=910000, difficulty=456.7)),
+    )
 
     result = await onchain.get_difficulty()
 
@@ -24,9 +32,13 @@ async def test_get_difficulty_uses_rpc_result():
 
 
 @pytest.mark.asyncio
-async def test_get_block_reward_uses_halving_formula():
+async def test_get_block_reward_uses_halving_formula(monkeypatch):
     # 210_000 * 4 => era 4 => 50 / 16 = 3.125
-    onchain.client.get_mining_info = AsyncMock(return_value=MagicMock(blocks=840000, difficulty=1.0))
+    monkeypatch.setattr(
+        onchain.client,
+        "get_mining_info",
+        AsyncMock(return_value=MagicMock(blocks=840000, difficulty=1.0)),
+    )
 
     result = await onchain.get_block_reward()
 
@@ -34,8 +46,12 @@ async def test_get_block_reward_uses_halving_formula():
 
 
 @pytest.mark.asyncio
-async def test_get_difficulty_falls_back_to_http_when_rpc_fails():
-    onchain.client.get_mining_info = AsyncMock(side_effect=RuntimeError("rpc down"))
+async def test_get_difficulty_falls_back_to_http_when_rpc_fails(monkeypatch):
+    monkeypatch.setattr(
+        onchain.client,
+        "get_mining_info",
+        AsyncMock(side_effect=RuntimeError("rpc down")),
+    )
 
     response = MagicMock()
     response.raise_for_status.return_value = None
@@ -56,8 +72,12 @@ async def test_get_difficulty_falls_back_to_http_when_rpc_fails():
 
 
 @pytest.mark.asyncio
-async def test_get_block_reward_falls_back_to_http_when_rpc_fails():
-    onchain.client.get_mining_info = AsyncMock(side_effect=RuntimeError("rpc down"))
+async def test_get_block_reward_falls_back_to_http_when_rpc_fails(monkeypatch):
+    monkeypatch.setattr(
+        onchain.client,
+        "get_mining_info",
+        AsyncMock(side_effect=RuntimeError("rpc down")),
+    )
 
     response = MagicMock()
     response.raise_for_status.return_value = None
