@@ -1,4 +1,5 @@
 aiohttp
+loguru
 pydantic
 pydantic_settings
 pytest
