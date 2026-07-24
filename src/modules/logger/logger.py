@@ -50,7 +50,6 @@ class Logger:
                 format=_FILE_FORMAT,
                 rotation="10 MB",
                 retention="14 days",
-                enqueue=True,
                 backtrace=False,
                 diagnose=False,
             )
@@ -69,7 +68,8 @@ class Logger:
         _logger.opt(depth=1).log("WARN", self._message(content))
 
     def error(self, *content: Any) -> None:
-        _logger.opt(depth=1, exception=True).error(self._message(content))
+        has_active_exception = sys.exc_info()[0] is not None
+        _logger.opt(depth=1, exception=has_active_exception).error(self._message(content))
 
     def crit(self, *content: Any) -> None:
         _logger.opt(depth=1).log("CRIT", self._message(content))
