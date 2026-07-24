@@ -6,39 +6,22 @@ import pytest
 from src.middlewares.logger import error_handler
 
 
-class DummyLine:
-    def __init__(self):
-        self.entries = []
-        self.edited = False
-
-    def add_text(self, *content):
-        self.entries.extend(content)
-
-    def edit_print(self):
-        self.edited = True
-
-
 class DummyLog:
     def __init__(self):
-        self.line = DummyLine()
+        self.calls = []
         self.error_called = False
-        self.called = []
 
-    def get(self, path):
-        self.called.append(("GET", path))
-        return self.line
+    def get(self, *content):
+        self.calls.append(("GET", *content))
 
-    def post(self, path):
-        self.called.append(("POST", path))
-        return self.line
+    def post(self, *content):
+        self.calls.append(("POST", *content))
 
-    def delete(self, path):
-        self.called.append(("DELETE", path))
-        return self.line
+    def delete(self, *content):
+        self.calls.append(("DELETE", *content))
 
-    def info(self, path):
-        self.called.append(("INFO", path))
-        return self.line
+    def info(self, *content):
+        self.calls.append(("INFO", *content))
 
     def error(self, *_):
         self.error_called = True
@@ -58,10 +41,7 @@ async def test_error_handler_logs_success(monkeypatch):
     response = await error_handler(request, ok_handler)
 
     assert response.status == 201
-    assert ("GET", "/health") in dummy.called
-    assert "HTTP" in dummy.line.entries
-    assert 201 in dummy.line.entries
-    assert dummy.line.edited is True
+    assert dummy.calls == [("GET", "/health", 201)]
 
 
 @pytest.mark.asyncio
@@ -78,7 +58,5 @@ async def test_error_handler_logs_http_exception_and_reraises(monkeypatch):
     with pytest.raises(HTTPBadRequest):
         await error_handler(request, failing_handler)
 
-    assert ("POST", "/v1/bitcoin-price") in dummy.called
-    assert "HTTP" in dummy.line.entries
-    assert 400 in dummy.line.entries
+    assert dummy.calls == [("POST", "/v1/bitcoin-price", 400)]
     assert dummy.error_called is True
