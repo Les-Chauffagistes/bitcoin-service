@@ -11,19 +11,10 @@ class DummyLog:
         self.calls = []
         self.error_called = False
 
-    def get(self, *content):
-        self.calls.append(("GET", *content))
-
-    def post(self, *content):
-        self.calls.append(("POST", *content))
-
-    def delete(self, *content):
-        self.calls.append(("DELETE", *content))
-
     def info(self, *content):
         self.calls.append(("INFO", *content))
 
-    def error(self, *_):
+    def exception(self, *_):
         self.error_called = True
 
 
@@ -41,7 +32,7 @@ async def test_error_handler_logs_success(monkeypatch):
     response = await error_handler(request, ok_handler)
 
     assert response.status == 201
-    assert dummy.calls == [("GET", "/health", 201)]
+    assert dummy.calls == [("INFO", "GET /health 201")]
 
 
 @pytest.mark.asyncio
@@ -58,5 +49,5 @@ async def test_error_handler_logs_http_exception_and_reraises(monkeypatch):
     with pytest.raises(HTTPBadRequest):
         await error_handler(request, failing_handler)
 
-    assert dummy.calls == [("POST", "/v1/bitcoin-price", 400)]
+    assert dummy.calls == [("INFO", "POST /v1/bitcoin-price 400")]
     assert dummy.error_called is True
