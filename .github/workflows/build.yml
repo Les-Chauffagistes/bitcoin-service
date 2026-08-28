@@ -10,10 +10,10 @@ on:
 jobs:
   build-push:
     if: github.event_name == 'push'
-    uses: les-chauffagistes/deploy/.github/workflows/build.yml@develop
+    uses: Les-Chauffagistes/deploy/.github/workflows/build.yml@2e32eae14ae1affc59d3b271735fb5fb0e7e4fb3
     with:
       service-name: bitcoin-service
     secrets:
       REGISTRY_USER:     ${{ secrets.REGISTRY_USER }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-      ORG_PAT:          $ {{ secrets.ORG_PAT }}
+      ORG_PAT:           ${{ secrets.ORG_PAT }}
