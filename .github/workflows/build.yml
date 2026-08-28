@@ -14,6 +14,8 @@ jobs:
     with:
       service-name: bitcoin-service
     secrets:
-      REGISTRY_USER:     ${{ secrets.REGISTRY_USER }}
-      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-      ORG_PAT:          $ {{ secrets.ORG_PAT }}
+      REGISTRY_USER:       ${{ secrets.REGISTRY_USER }}
+      REGISTRY_PASSWORD:   ${{ secrets.REGISTRY_PASSWORD }}
+      VERDACCIO_PASSWORD:  ${{ secrets.VERDACCIO_PASSWORD }}
+      PYPISERVER_PASSWORD: ${{ secrets.PYPISERVER_PASSWORD }}
+      ORG_PAT:             ${{ secrets.ORG_PAT }}
