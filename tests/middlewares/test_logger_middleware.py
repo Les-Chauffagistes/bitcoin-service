@@ -11,24 +11,15 @@ class DummyLog:
         self.calls = []
         self.error_called = False
 
-    def get(self, *content):
-        self.calls.append(("GET", *content))
-
-    def post(self, *content):
-        self.calls.append(("POST", *content))
-
-    def delete(self, *content):
-        self.calls.append(("DELETE", *content))
-
     def info(self, *content):
         self.calls.append(("INFO", *content))
 
-    def error(self, *_):
+    def exception(self, *_):
         self.error_called = True
 
 
 @pytest.mark.asyncio
-async def test_error_handler_logs_success(monkeypatch):
+async def test_error_handler_passes_through_successful_responses(monkeypatch):
     dummy = DummyLog()
     import init as hs_init
 
@@ -41,7 +32,9 @@ async def test_error_handler_logs_success(monkeypatch):
     response = await error_handler(request, ok_handler)
 
     assert response.status == 201
-    assert dummy.calls == [("GET", "/health", 201)]
+    # Le log de résumé par requête vit désormais dans
+    # chauff_cmn.logging.aiohttp.request_logging_middleware, pas ici.
+    assert dummy.calls == []
 
 
 @pytest.mark.asyncio
@@ -58,5 +51,5 @@ async def test_error_handler_logs_http_exception_and_reraises(monkeypatch):
     with pytest.raises(HTTPBadRequest):
         await error_handler(request, failing_handler)
 
-    assert dummy.calls == [("POST", "/v1/bitcoin-price", 400)]
+    assert dummy.calls == []
     assert dummy.error_called is True
