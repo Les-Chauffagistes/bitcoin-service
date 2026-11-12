@@ -10,7 +10,7 @@ on:
 jobs:
   build-push:
     if: github.event_name == 'push'
-    uses: Les-Chauffagistes/deploy/.github/workflows/build.yml@f2251700b5b235a3965d6bb793a63e63cd43e673
+    uses: Les-Chauffagistes/deploy/.github/workflows/build.yml@57bed92d6c909eea726735ec1783b4d17d139360
     with:
       service-name: bitcoin-service
     secrets:
