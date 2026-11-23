@@ -24,6 +24,8 @@ UNKNOWN_ADDRESS_GRACE = timedelta(hours=1)
 # Statuts du shop qui valent « réessayer » même s'ils sont en 4xx
 RETRYABLE_4XX = {404, 408, 425, 429}
 HELD_RECHECK = timedelta(seconds=60)
+# Avis « paiement vu » : utile seulement pendant la réservation du shop (30 min), abandonné ensuite sans bruit
+SEEN_WINDOW = timedelta(minutes=30)
 BATCH = 10
 
 _CLAIM_SQL = """
@@ -37,6 +39,19 @@ WHERE id IN (
   FOR UPDATE SKIP LOCKED
 )
 RETURNING id::text AS id, txid, vout, attempts, created_at
+"""
+
+_CLAIM_SEEN_SQL = """
+UPDATE seen_notice
+SET next_attempt_at = now() + make_interval(secs => $1::double precision)
+WHERE id IN (
+  SELECT id FROM seen_notice
+  WHERE delivered_at IS NULL AND failed_at IS NULL AND next_attempt_at <= now()
+  ORDER BY next_attempt_at
+  LIMIT $2::int
+  FOR UPDATE SKIP LOCKED
+)
+RETURNING id::text AS id, invoice_id::text AS invoice_id, txid, vout, total_sats::text AS total_sats, attempts, created_at
 """
 
 
@@ -69,6 +84,7 @@ class Sender:
     ):
         self._db = db
         self._url = url
+        self._seen_url = url.rstrip("/") + "/seen"
         self._headers = {"Authorization": f"Bearer {secret}"}
         self._min_confirmations = min_confirmations
         self._interval = interval_seconds
@@ -89,7 +105,50 @@ class Sender:
         for result in results:
             if isinstance(result, Exception):
                 log.opt(exception=result).error("Erreur inattendue pendant un envoi")
+        return len(claimed) + await self._tick_seen()
+
+    async def _tick_seen(self) -> int:
+        claimed = await self._db.query_raw(_CLAIM_SEEN_SQL, self._claim_seconds, BATCH)
+        results = await asyncio.gather(*(self._deliver_seen(row) for row in claimed), return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                log.opt(exception=result).error("Erreur inattendue pendant l'envoi d'un avis « paiement vu »")
         return len(claimed)
+
+    async def _deliver_seen(self, row: dict) -> None:
+        """Avis au mieux : le shop arrête le décompte de sa réservation. Réessais courts, jamais d'alerte (le
+        webhook de confirmation reste la référence)."""
+        invoice = await self._db.invoice.find_unique(where={"id": row["invoice_id"]})
+        now = datetime.now(timezone.utc)
+        created_at = row["created_at"]
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        attempts = row["attempts"] + 1
+        status: int | None = None
+        try:
+            payload = {"address": invoice.address, "txid": row["txid"], "vout": row["vout"], "totalSats": row["total_sats"]}
+            async with self._get_session().post(self._seen_url, json=payload, headers=self._headers) as response:
+                status = response.status
+        except (ClientError, asyncio.TimeoutError, OSError) as exc:
+            log.warning("Avis « paiement vu » : échec d'envoi ({})", type(exc).__name__)
+
+        outcome = Outcome.RETRY if status is None else classify(status)
+        if outcome is Outcome.DELIVERED:
+            await self._db.seennotice.update(
+                where={"id": row["id"]}, data={"deliveredAt": now, "attempts": attempts, "lastStatusCode": status}
+            )
+            log.info("Avis « paiement vu » livré (facture {}, essai {})", invoice.orderId, attempts)
+        elif outcome is Outcome.REJECTED or now - created_at >= SEEN_WINDOW:
+            log.warning("Avis « paiement vu » abandonné (facture {}, statut {})", invoice.orderId, status)
+            await self._db.seennotice.update(
+                where={"id": row["id"]}, data={"failedAt": now, "attempts": attempts, "lastStatusCode": status}
+            )
+        else:
+            delay = timedelta(seconds=retry_delay(attempts))
+            await self._db.seennotice.update(
+                where={"id": row["id"]},
+                data={"nextAttemptAt": now + delay, "attempts": attempts, "lastStatusCode": status},
+            )
 
     async def _deliver(self, row: dict) -> None:
         key = {"txid_vout": {"txid": row["txid"], "vout": row["vout"]}}

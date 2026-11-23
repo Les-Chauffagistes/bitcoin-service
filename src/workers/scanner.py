@@ -128,6 +128,8 @@ class Scanner:
             for entry in received:
                 if entry["address"] in issued:
                     await self._record(tx, entry)
+            for address in {e["address"] for e in received if e["address"] in issued}:
+                await self._flag_seen(tx, address)
             await tx.execute_raw(
                 "UPDATE scan_cursor SET last_block_hash = $1::text, last_block_height = $2::int "
                 "WHERE id = 1 AND lease_owner = $3::text",
@@ -176,6 +178,25 @@ class Scanner:
             await tx.webhookdelivery.create_many(
                 data=[{"txid": entry["txid"], "vout": entry["vout"]}], skip_duplicates=True
             )
+
+    async def _flag_seen(self, tx, address: str) -> None:
+        """Met en file l'avis « paiement complet vu » dès que les sorties vues couvrent le montant attendu.
+
+        Compte aussi le mempool (0 confirmation) : c'est tout l'intérêt, le shop arrête le décompte de sa
+        réservation sans attendre les confirmations. Une seule fois par facture.
+        """
+        invoice = await tx.invoice.find_unique(where={"address": address}, include={"outputs": True, "seenNotice": True})
+        if invoice is None or invoice.seenNotice is not None:
+            return
+        outputs = [o for o in invoice.outputs or [] if o.amountSats > self._dust_sats]
+        total = sum(o.amountSats for o in outputs)
+        if not outputs or total < invoice.expectedSats:
+            return
+        last = max(outputs, key=lambda o: o.firstSeenAt)
+        await tx.seennotice.create_many(
+            data=[{"invoiceId": invoice.id, "txid": last.txid, "vout": last.vout, "totalSats": total}],
+            skip_duplicates=True,
+        )
 
     async def _drop(self, tx, entry: dict) -> None:
         """Transaction sortie de la chaîne par une réorganisation."""

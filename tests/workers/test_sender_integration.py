@@ -37,12 +37,13 @@ async def env(monkeypatch, postgres_url):
     shop = FakeShop()
     app = web.Application()
     app.router.add_post("/api/internal/payments", shop.handle)
+    app.router.add_post("/api/internal/payments/seen", shop.handle)
     server = TestServer(app)
     await server.start_server()
 
     db = Prisma(datasource={"url": postgres_url})
     await db.connect()
-    await db.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
+    await db.execute_raw('TRUNCATE "seen_notice", "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
 
     def make_sender(**kwargs):
         return Sender(
@@ -254,3 +255,52 @@ async def test_replay_skips_dust_and_unconfirmed(env):
     assert await deliveries.replay_invoice("dust", env.db) == 0
     assert await deliveries.replay_invoice("young", env.db) == 0
     assert await env.db.webhookdelivery.count() == 0
+
+
+async def _seen_notice(env, order_id="o1"):
+    invoice, txid = await env.make_delivery(order_id, confirmations=0)
+    await env.db.webhookdelivery.delete_many()
+    await env.db.seennotice.create(data={"invoice": {"connect": {"id": invoice.id}}, "txid": txid, "vout": 1, "totalSats": 1_400_000})
+    return invoice, txid
+
+
+@pytest.mark.asyncio
+async def test_seen_notice_is_sent_with_total_and_marked_delivered(env):
+    invoice, txid = await _seen_notice(env)
+
+    assert await env.make_sender().tick() == 1
+
+    assert env.shop.received == [
+        {"auth": f"Bearer {SECRET}", "body": {"address": invoice.address, "txid": txid, "vout": 1, "totalSats": "1400000"}}
+    ]
+    notice = await env.db.seennotice.find_first()
+    assert (notice.attempts, notice.lastStatusCode) == (1, 201)
+    assert notice.deliveredAt is not None
+    assert await env.make_sender().tick() == 0
+    # Un avis au mieux ne marque jamais la sortie comme notifiée : seul le webhook de confirmation le fait
+    assert (await env.db.receivedoutput.find_first()).notifiedAt is None
+
+
+@pytest.mark.asyncio
+async def test_seen_notice_retries_then_gives_up_quietly_after_30_minutes(env):
+    await _seen_notice(env)
+    env.shop.statuses = [503]
+    sender = env.make_sender()
+    await sender.tick()
+    notice = await env.db.seennotice.find_first()
+    assert (notice.attempts, notice.lastStatusCode, notice.deliveredAt, notice.failedAt) == (1, 503, None, None)
+
+    await env.db.execute_raw("UPDATE \"seen_notice\" SET \"created_at\" = now() - interval '31 minutes', \"next_attempt_at\" = now()")
+    env.shop.default = 503
+    await sender.tick()
+    notice = await env.db.seennotice.find_first()
+    assert notice.failedAt is not None and notice.deliveredAt is None
+    assert env.alerts() == []
+
+
+@pytest.mark.asyncio
+async def test_seen_notice_rejection_is_final(env):
+    await _seen_notice(env)
+    env.shop.default = 400
+    await env.make_sender().tick()
+    assert (await env.db.seennotice.find_first()).failedAt is not None
