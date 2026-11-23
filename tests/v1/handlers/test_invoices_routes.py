@@ -43,7 +43,12 @@ async def api_client():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("method", "path"),
-    [("post", "/invoices"), ("get", f"/invoices/{ORDER_ID}"), ("get", "/fee-estimate")],
+    [
+        ("post", "/invoices"),
+        ("get", f"/invoices/{ORDER_ID}"),
+        ("post", f"/invoices/{ORDER_ID}/replay"),
+        ("get", "/fee-estimate"),
+    ],
 )
 async def test_routes_require_api_key(api_client: TestClient, method, path):
     assert (await getattr(api_client, method)(path)).status == 401
@@ -146,3 +151,19 @@ async def test_fee_estimate(api_client: TestClient):
     with patch.object(handlers.fees.fees, "get_refund_fee_sats", AsyncMock(return_value=1_410)):
         response = await api_client.get("/fee-estimate", headers=HEADERS)
     assert await response.json() == {"refundNetworkFeeSats": "1410"}
+
+
+@pytest.mark.asyncio
+async def test_replay_returns_queued_count(api_client: TestClient):
+    with patch.object(handlers.invoices.deliveries, "replay_invoice", AsyncMock(return_value=2)) as replay:
+        response = await api_client.post(f"/invoices/{ORDER_ID}/replay", headers=HEADERS)
+    assert await response.json() == {"queued": 2}
+    replay.assert_awaited_once_with(ORDER_ID)
+
+
+@pytest.mark.asyncio
+async def test_replay_unknown_invoice_is_404(api_client: TestClient):
+    error = ApiError(404, "invoice_not_found", "Facture introuvable.")
+    with patch.object(handlers.invoices.deliveries, "replay_invoice", AsyncMock(side_effect=error)):
+        response = await api_client.post("/invoices/unknown/replay", headers=HEADERS)
+    assert response.status == 404

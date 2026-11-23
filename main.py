@@ -27,6 +27,7 @@ def start_workers() -> list[Task]:
     from src.modules.db import db
     from src.v1.services.invoices import get_deriver
     from src.workers.scanner import Scanner
+    from src.workers.sender import Sender
 
     scanner = Scanner(
         node=rpc,
@@ -38,7 +39,15 @@ def start_workers() -> list[Task]:
         dust_sats=settings.dust_sats,
         interval_seconds=settings.scan_interval_seconds,
     )
-    return [create_task(scanner.run(), name="scanner")]
+    sender = Sender(
+        db=db,
+        url=settings.shop_webhook_url,
+        secret=settings.shop_webhook_secret,
+        min_confirmations=settings.min_confirmations,
+        interval_seconds=settings.sender_interval_seconds,
+        timeout_seconds=settings.webhook_timeout_seconds,
+    )
+    return [create_task(scanner.run(), name="scanner"), create_task(sender.run(), name="sender")]
 
 
 async def main():

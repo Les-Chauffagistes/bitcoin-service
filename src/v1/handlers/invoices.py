@@ -6,7 +6,7 @@ from src.middlewares.authorization import require_auth
 
 from ..app import routes
 from ..errors import ApiError, json_errors
-from ..services import invoices
+from ..services import deliveries, invoices
 
 _ORDER_ID = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 _AMOUNT_CENTS = re.compile(r"^[1-9]\d{0,17}$")
@@ -66,3 +66,10 @@ async def get_invoice(request: Request):
             ],
         }
     )
+
+
+@routes.post("/invoices/{order_id}/replay")
+@require_auth
+@json_errors
+async def replay_invoice(request: Request):
+    return json_response({"queued": await deliveries.replay_invoice(request.match_info["order_id"])})

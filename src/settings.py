@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     scan_interval_seconds: int = Field(default=15, ge=1)
     dust_sats: int = 1_000
 
+    shop_webhook_url: str
+    shop_webhook_secret: str = Field(min_length=32)
+    webhook_timeout_seconds: float = 10
+    sender_interval_seconds: float = 2
+
     api_token: str = Field(min_length=32)
     database_url: str
 
