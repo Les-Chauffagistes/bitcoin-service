@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      secrets:
+        - pipindex
     env_file: .env
     environment:
       # Dans le réseau compose, la base est le service « db » (le .env vise localhost pour les tests hors conteneur)
@@ -30,3 +33,7 @@ services:
 
 volumes:
   db-data:
+
+secrets:
+  pipindex:
+    environment: PIP_EXTRA_INDEX_URL
