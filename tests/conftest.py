@@ -13,3 +13,8 @@ os.environ.setdefault("BITCOIN_RPC_PASSWORD", "password")
 os.environ.setdefault("BITCOIN_NETWORK", "regtest")
 os.environ.setdefault("API_TOKEN", "test-token-0123456789abcdef0123456789")
 os.environ.setdefault("DATABASE_URL", "postgresql://user:password@127.0.0.1:5432/test")
+# xpub de test du vecteur BIP84 (réseau main)
+os.environ.setdefault(
+    "XPUB",
+    "xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V",
+)

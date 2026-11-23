@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     bitcoin_rpc_wallet: str = ""
     bitcoin_network: Literal["main", "testnet4", "regtest"]
 
+    xpub: str
+    fee_min_sats: int = 500
+    fee_max_sats: int = 20_000
+    price_max_age_seconds: int = 1800
+
     api_token: str = Field(min_length=32)
     database_url: str
 

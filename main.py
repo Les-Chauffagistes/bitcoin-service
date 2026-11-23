@@ -1,11 +1,30 @@
 from src.settings import settings
 from init import routes, app, log
 from aiohttp import web
+from src.v1.services.derivation import NetworkMismatch
 from asyncio import new_event_loop, set_event_loop, Future
+
+
+async def startup_checks():
+    from src.modules.db import db
+    from src.utils.alerts import alert
+    from src.v1.services.invoices import get_deriver
+
+    # Refuse de démarrer : xpub invalide ou d'un autre réseau (ValueError), base injoignable
+    deriver = get_deriver()
+    await db.connect()
+    try:
+        await deriver.check_network()
+    except NetworkMismatch:
+        raise
+    except Exception as exc:
+        # Nœud injoignable au démarrage : le contrôle est refait avant chaque dérivation
+        alert("node_unreachable", "Réseau du nœud non vérifié au démarrage", level="WARNING", error=str(exc))
 
 
 async def main():
     log.info("Démarrage du serveur...")
+    await startup_checks()
     
     runner = web.AppRunner(app)
     await runner.setup()
