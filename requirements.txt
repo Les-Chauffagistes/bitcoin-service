@@ -1,7 +1,9 @@
 aiohttp
-chauff-cmn>=0.0.7
+chauff-cmn>=0.1.26
+prisma==0.15.0
 pydantic
 pydantic_settings
 pytest
 pytest-asyncio
 pytest-cov
+testcontainers==4.15.0

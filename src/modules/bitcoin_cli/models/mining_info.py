@@ -1,4 +1,3 @@
-from typing import Literal
 from pydantic import BaseModel
 
 
@@ -7,5 +6,5 @@ class MiningInfo(BaseModel):
     difficulty: float
     networkhashps: float
     pooledtx: int
-    chain: Literal["main"]
+    chain: str
     warnings: list
