@@ -68,7 +68,7 @@ async def env(monkeypatch, postgres_url, bitcoind):
     await db.connect()
     # Pas de RESTART IDENTITY : comme en production un index n'est jamais rejoué, sinon une adresse déjà
     # payée lors d'un test précédent (la chaîne regtest persiste) serait retrouvée par le rescan.
-    await db.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
+    await db.execute_raw('TRUNCATE "seen_notice", "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
 
     name = f"scan-{uuid.uuid4().hex[:8]}"
     wallet = Client(host, port, user, password, wallet=name)
@@ -236,3 +236,39 @@ async def test_reorg_after_notification_raises_an_alert(env):
     alerts = [r["extra"] for r in records if r["extra"].get("alert_name") == "reorg_after_notification"]
     assert alerts and alerts[0]["order_id"] == "o4"
     assert (await env.db.receivedoutput.find_first()).confirmations == 0
+
+
+@pytest.mark.asyncio
+async def test_seen_notice_queued_when_mempool_covers_the_expected_amount(env):
+    # 119 000 centimes à 90 000 € le BTC = 1 322 223 sats attendus
+    invoice, _ = await invoices.create_invoice("o-seen", 119_000, env.db)
+    assert invoice.expectedSats == 1_322_223
+    scanner = env.make_scanner()
+    await scanner.setup()
+
+    # Paiement partiel vu : rien
+    await env.chain.pay(invoice.address, "0.0100")
+    await scanner.tick()
+    assert await env.db.seennotice.find_many() == []
+
+    # Le complément, encore dans le mempool (0 confirmation) : avis en file, pas de webhook de confirmation
+    txid = await env.chain.pay(invoice.address, "0.0040")
+    await scanner.tick()
+    [notice] = await env.db.seennotice.find_many()
+    assert (notice.invoiceId, notice.txid, notice.totalSats) == (invoice.id, txid, 1_400_000)
+    assert await _deliveries(env.db) == []
+
+    # Une seule fois par facture, même après de nouveaux passages et paiements
+    await env.chain.pay(invoice.address, "0.0010")
+    await scanner.tick()
+    assert len(await env.db.seennotice.find_many()) == 1
+
+
+@pytest.mark.asyncio
+async def test_seen_notice_ignores_dust_and_unissued_addresses(env):
+    invoice, _ = await invoices.create_invoice("o-seen-dust", 100, env.db)
+    scanner = env.make_scanner()
+    await scanner.setup()
+    await env.chain.pay(invoice.address, "0.00000600")
+    await scanner.tick()
+    assert await env.db.seennotice.find_many() == []

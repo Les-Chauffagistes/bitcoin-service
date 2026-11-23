@@ -21,7 +21,8 @@ model Invoice {
   expectedSats        BigInt   @map("expected_sats")
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  outputs ReceivedOutput[]
+  outputs    ReceivedOutput[]
+  seenNotice SeenNotice?
 
   @@map("invoice")
 }
@@ -69,6 +70,30 @@ model WebhookDelivery {
   @@unique([txid, vout])
   @@index([nextAttemptAt])
   @@map("webhook_delivery")
+}
+
+/// Avis « paiement complet vu » (mempool ou chaîne, avant les confirmations) : une ligne par facture, créée par le
+/// scanner quand la somme des sorties vues couvre le montant attendu. Le shop arrête alors le décompte de sa
+/// réservation. Au mieux : quelques essais, abandonné après 30 min (le webhook de confirmation reste la référence).
+model SeenNotice {
+  id             String    @id @default(uuid()) @db.Uuid
+  invoiceId      String    @unique @map("invoice_id") @db.Uuid
+  /// Sortie qui a fait atteindre le montant attendu
+  txid           String
+  vout           Int
+  /// Somme des sorties vues sur l'adresse (hors poussière), sats
+  totalSats      BigInt    @map("total_sats")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastStatusCode Int?      @map("last_status_code")
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz(6)
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([nextAttemptAt])
+  @@map("seen_notice")
 }
 
 /// Curseur du scanner et bail du scanner actif (un seul enregistrement, id = 1).
