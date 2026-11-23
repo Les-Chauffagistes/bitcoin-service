@@ -2,6 +2,31 @@ services:
   app:
     build: .
     env_file: .env
+    environment:
+      # Dans le réseau compose, la base est le service « db » (le .env vise localhost pour les tests hors conteneur)
+      DATABASE_URL: postgresql://bitcoin:bitcoin@db:5432/bitcoin_service
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${SERVER_PORT:-8086}:${SERVER_PORT:-8086}"
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bitcoin
+      POSTGRES_PASSWORD: bitcoin
+      POSTGRES_DB: bitcoin_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bitcoin -d bitcoin_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:

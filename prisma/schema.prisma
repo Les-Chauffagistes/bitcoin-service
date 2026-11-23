@@ -1,0 +1,74 @@
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = -1
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Une facture du shop = une adresse de réception, jamais réutilisée.
+model Invoice {
+  id                  String   @id @default(uuid()) @db.Uuid
+  orderId             String   @unique @map("order_id")
+  /// Chemin 0/<index> sous la xpub ; séquence Postgres, donc unique même avec plusieurs instances.
+  derivationIndex     Int      @unique @default(autoincrement()) @map("derivation_index")
+  address             String   @unique
+  amountCents         BigInt   @map("amount_cents")
+  btcPriceEurCents    BigInt   @map("btc_price_eur_cents")
+  expectedSats        BigInt   @map("expected_sats")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  outputs ReceivedOutput[]
+
+  @@map("invoice")
+}
+
+/// Une sortie (txid, vout) vue sur une adresse émise par le service.
+model ReceivedOutput {
+  txid          String
+  vout          Int
+  address       String
+  amountSats    BigInt    @map("amount_sats")
+  firstSeenAt   DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  blockHeight   Int?      @map("block_height")
+  blockHash     String?   @map("block_hash")
+  confirmations Int       @default(0)
+  /// Première notification acceptée (2xx) par le shop.
+  notifiedAt    DateTime? @map("notified_at") @db.Timestamptz(6)
+
+  invoice    Invoice           @relation(fields: [address], references: [address])
+  deliveries WebhookDelivery[]
+
+  @@id([txid, vout])
+  @@index([address])
+  @@map("received_output")
+}
+
+/// Une tentative de livraison du webhook (une ligne par essai).
+model WebhookDelivery {
+  id            String    @id @default(uuid()) @db.Uuid
+  txid          String
+  vout          Int
+  attempt       Int
+  statusCode    Int?      @map("status_code")
+  error         String?
+  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  output ReceivedOutput @relation(fields: [txid, vout], references: [txid, vout])
+
+  @@index([nextAttemptAt])
+  @@map("webhook_delivery")
+}
+
+/// Curseur du scanner (un seul enregistrement, id = 1).
+model ScanCursor {
+  id              Int    @id @default(1)
+  lastBlockHash   String @map("last_block_hash")
+  lastBlockHeight Int    @map("last_block_height")
+
+  @@map("scan_cursor")
+}

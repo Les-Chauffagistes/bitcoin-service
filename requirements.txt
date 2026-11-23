@@ -1,5 +1,6 @@
 aiohttp
 chauff-cmn>=0.0.7
+prisma==0.15.0
 pydantic
 pydantic_settings
 pytest
