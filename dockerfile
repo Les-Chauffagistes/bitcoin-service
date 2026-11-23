@@ -2,6 +2,12 @@ FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
+# Node pour le CLI Prisma : prisma-client-py utilise celui du système s'il existe. Son Node embarqué
+# (nodeenv) ne démarre pas dans l'image slim (libatomic.so.1 manquante). openssl : moteurs de Prisma.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        nodejs npm openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN --mount=type=secret,id=pipindex \
     PIP_EXTRA_INDEX_URL="$(cat /run/secrets/pipindex 2>/dev/null || true)" \
@@ -17,11 +23,14 @@ FROM python:3.13-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl \
+        curl nodejs openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+# Client Prisma généré (site-packages) ci-dessus ; ici le CLI Prisma et ses moteurs, sans quoi
+# `prisma migrate deploy` les retélécharge au démarrage du conteneur.
+COPY --from=builder /root/.cache /root/.cache
 
 COPY . .
 
