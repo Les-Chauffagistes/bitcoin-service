@@ -39,36 +39,45 @@ model ReceivedOutput {
   /// Première notification acceptée (2xx) par le shop.
   notifiedAt    DateTime? @map("notified_at") @db.Timestamptz(6)
 
-  invoice    Invoice           @relation(fields: [address], references: [address])
-  deliveries WebhookDelivery[]
+  invoice  Invoice          @relation(fields: [address], references: [address])
+  delivery WebhookDelivery?
 
   @@id([txid, vout])
   @@index([address])
   @@map("received_output")
 }
 
-/// Une tentative de livraison du webhook (une ligne par essai).
+/// File d'envoi du webhook : une ligne par sortie, créée par le scanner, consommée par l'envoi.
+/// Une ligne est « en attente » tant que `deliveredAt` et `failedAt` sont nuls.
 model WebhookDelivery {
-  id            String    @id @default(uuid()) @db.Uuid
-  txid          String
-  vout          Int
-  attempt       Int
-  statusCode    Int?      @map("status_code")
-  error         String?
-  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz(6)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  txid           String
+  vout           Int
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastStatusCode Int?      @map("last_status_code")
+  lastError      String?   @map("last_error")
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz(6)
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz(6)
+  /// `rejected` (400, 401, 409 du shop) ou `expired` (72 h de réessais épuisées).
+  failReason     String?   @map("fail_reason")
+  /// Début de la fenêtre de réessais (remis à zéro par un replay).
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   output ReceivedOutput @relation(fields: [txid, vout], references: [txid, vout])
 
+  @@unique([txid, vout])
   @@index([nextAttemptAt])
   @@map("webhook_delivery")
 }
 
-/// Curseur du scanner (un seul enregistrement, id = 1).
+/// Curseur du scanner et bail du scanner actif (un seul enregistrement, id = 1).
 model ScanCursor {
-  id              Int    @id @default(1)
-  lastBlockHash   String @map("last_block_hash")
-  lastBlockHeight Int    @map("last_block_height")
+  id              Int       @id @default(1)
+  lastBlockHash   String?   @map("last_block_hash")
+  lastBlockHeight Int?      @map("last_block_height")
+  leaseOwner      String?   @map("lease_owner")
+  leaseUntil      DateTime? @map("lease_until") @db.Timestamptz(6)
 
   @@map("scan_cursor")
 }

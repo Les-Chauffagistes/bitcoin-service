@@ -1,7 +1,7 @@
 """Création de factures sur un vrai Postgres.
 
 Ignoré sans INTEGRATION_DATABASE_URL (base jetable avec les migrations appliquées, par exemple
-postgresql://bitcoin:bitcoin@localhost:55432/bitcoin_service). Les tables sont vidées au début.
+postgresql://bitcoin:bitcoin@localhost:55432/bitcoin_service). Les tables sont vidées au début (séquence conservée : un index n'est jamais rejoué).
 """
 import asyncio
 import os
@@ -28,7 +28,7 @@ class FakeDeriver:
 async def client(monkeypatch):
     client = Prisma(datasource={"url": URL})
     await client.connect()
-    await client.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice" RESTART IDENTITY CASCADE')
+    await client.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
     monkeypatch.setattr(invoices, "get_deriver", lambda: FakeDeriver())
 
     async def price():

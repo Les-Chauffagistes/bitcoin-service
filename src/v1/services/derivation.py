@@ -26,7 +26,7 @@ class AddressDeriver:
             raise NetworkMismatch(f"Le nœud est sur le réseau {chain}, {self._network} attendu")
         self._network_checked = True
 
-    async def _get_descriptor(self) -> str:
+    async def get_descriptor(self) -> str:
         if self._descriptor is None:
             info = await self._client.get_descriptor_info(f"wpkh({self._xpub}/0/*)")
             # `descriptor` contient déjà le `#checksum` exigé par deriveaddresses
@@ -35,5 +35,5 @@ class AddressDeriver:
 
     async def address(self, index: int) -> str:
         await self.check_network()
-        addresses = await self._client.derive_addresses(await self._get_descriptor(), index, index)
+        addresses = await self._client.derive_addresses(await self.get_descriptor(), index, index)
         return addresses[0]
