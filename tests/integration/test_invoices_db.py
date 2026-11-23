@@ -1,21 +1,14 @@
-"""Création de factures sur un vrai Postgres.
+"""Création de factures sur un vrai Postgres (testcontainers, migrations appliquées).
 
-Ignoré sans INTEGRATION_DATABASE_URL (base jetable avec les migrations appliquées, par exemple
-postgresql://bitcoin:bitcoin@localhost:55432/bitcoin_service). Les tables sont vidées au début (séquence conservée : un index n'est jamais rejoué).
+Les tables sont vidées avant chaque test ; la séquence est conservée (un index n'est jamais rejoué).
 """
 import asyncio
-import os
-
 import pytest
 import pytest_asyncio
 from prisma import Prisma
 
 from src.v1.errors import ApiError
 from src.v1.services import invoices
-
-URL = os.environ.get("INTEGRATION_DATABASE_URL")
-
-pytestmark = pytest.mark.skipif(not URL, reason="INTEGRATION_DATABASE_URL non défini")
 
 
 class FakeDeriver:
@@ -25,8 +18,8 @@ class FakeDeriver:
 
 
 @pytest_asyncio.fixture
-async def client(monkeypatch):
-    client = Prisma(datasource={"url": URL})
+async def client(monkeypatch, postgres_url):
+    client = Prisma(datasource={"url": postgres_url})
     await client.connect()
     await client.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
     monkeypatch.setattr(invoices, "get_deriver", lambda: FakeDeriver())

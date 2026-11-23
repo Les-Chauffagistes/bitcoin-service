@@ -1,9 +1,5 @@
-"""Envoi du webhook contre un vrai Postgres et un faux shop HTTP.
-
-Ignoré sans INTEGRATION_DATABASE_URL (base avec les migrations appliquées).
-"""
+"""Envoi du webhook contre un vrai Postgres (testcontainers) et un faux shop HTTP."""
 import asyncio
-import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -15,9 +11,6 @@ from prisma import Prisma
 
 from src.v1.services import deliveries, invoices
 from src.workers.sender import Sender
-
-DB_URL = os.environ.get("INTEGRATION_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not DB_URL, reason="INTEGRATION_DATABASE_URL non défini")
 
 SECRET = "shop-secret-0123456789abcdef0123456789"
 
@@ -40,14 +33,14 @@ class FakeShop:
 
 
 @pytest_asyncio.fixture
-async def env(monkeypatch):
+async def env(monkeypatch, postgres_url):
     shop = FakeShop()
     app = web.Application()
     app.router.add_post("/api/internal/payments", shop.handle)
     server = TestServer(app)
     await server.start_server()
 
-    db = Prisma(datasource={"url": DB_URL})
+    db = Prisma(datasource={"url": postgres_url})
     await db.connect()
     await db.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
 

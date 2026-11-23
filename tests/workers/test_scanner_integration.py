@@ -1,10 +1,4 @@
-"""Scanner contre un vrai Postgres et un vrai bitcoind en regtest.
-
-Ignoré sans INTEGRATION_DATABASE_URL et INTEGRATION_RPC (« hôte:port:utilisateur:mot_de_passe »).
-Exemple de nœud : docker run -p 18443:18443 ruimarinho/bitcoin-core -regtest -rpcuser=u -rpcpassword=p
--rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0 -rpcport=18443 -fallbackfee=0.0002
-"""
-import os
+"""Scanner contre un vrai Postgres et un vrai bitcoind en regtest (testcontainers, voir conftest.py)."""
 import uuid
 from datetime import datetime, timezone
 
@@ -19,11 +13,6 @@ from src.v1.services import invoices
 from src.v1.services.derivation import AddressDeriver
 from src.workers import wallet as wallet_ops
 from src.workers.scanner import Scanner
-
-DB_URL = os.environ.get("INTEGRATION_DATABASE_URL")
-RPC = os.environ.get("INTEGRATION_RPC")
-
-pytestmark = pytest.mark.skipif(not (DB_URL and RPC), reason="INTEGRATION_DATABASE_URL / INTEGRATION_RPC non définis")
 
 BIP84_XPUB = "xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V"
 TPUB = _b58encode_check(_CANONICAL["regtest"] + _b58decode_check(BIP84_XPUB)[4:])
@@ -70,19 +59,19 @@ class Chain:
 
 
 @pytest_asyncio.fixture
-async def env(monkeypatch):
-    host, port, user, password = RPC.split(":")
-    chain = Chain(host, int(port), user, password)
+async def env(monkeypatch, postgres_url, bitcoind):
+    host, port, user, password = bitcoind.host, bitcoind.port, bitcoind.user, bitcoind.password
+    chain = Chain(host, port, user, password)
     await chain.start()
 
-    db = Prisma(datasource={"url": DB_URL})
+    db = Prisma(datasource={"url": postgres_url})
     await db.connect()
     # Pas de RESTART IDENTITY : comme en production un index n'est jamais rejoué, sinon une adresse déjà
     # payée lors d'un test précédent (la chaîne regtest persiste) serait retrouvée par le rescan.
     await db.execute_raw('TRUNCATE "webhook_delivery", "received_output", "invoice", "scan_cursor" CASCADE')
 
     name = f"scan-{uuid.uuid4().hex[:8]}"
-    wallet = Client(host, int(port), user, password, wallet=name)
+    wallet = Client(host, port, user, password, wallet=name)
     deriver = AddressDeriver(chain.node, TPUB, "regtest")
     monkeypatch.setattr(invoices, "get_deriver", lambda: deriver)
 
